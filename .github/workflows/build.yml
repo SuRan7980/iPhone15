@@ -1,0 +1,60 @@
+name: Build Unsigned iOS IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build QuizIsland.ipa
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          ls /Applications | grep -i xcode || true
+          if [ -d "/Applications/Xcode_15.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_15.4.app
+          else
+            sudo xcode-select -s /Applications/Xcode.app
+          fi
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: QuizIsland_iOS17_Project/QuizIsland
+        run: xcodegen generate
+
+      - name: Archive (unsigned)
+        working-directory: QuizIsland_iOS17_Project/QuizIsland
+        run: |
+          xcodebuild -project QuizIsland.xcodeproj \
+            -scheme QuizIsland \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/QuizIsland.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            archive
+
+      - name: Package .ipa
+        working-directory: QuizIsland_iOS17_Project/QuizIsland
+        run: |
+          mkdir -p Payload
+          cp -r "build/QuizIsland.xcarchive/Products/Applications/QuizIsland.app" Payload/
+          zip -r QuizIsland.ipa Payload
+          ls -lh QuizIsland.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuizIsland-iOS17-Unsigned
+          path: QuizIsland_iOS17_Project/QuizIsland/QuizIsland.ipa
+          if-no-files-found: error
