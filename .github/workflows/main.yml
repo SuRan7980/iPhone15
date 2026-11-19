@@ -1,0 +1,55 @@
+name: Build Unsigned iOS IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    name: Build QuizIsland IPA on macOS
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Locate project root and auto-patch
+        run: |
+          PROJECT_DIR=$(dirname $(find . -name "project.yml" | head -n 1))
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          cd "$PROJECT_DIR"
+          sed -i '' 's/import AppIntents/import SwiftUI\nimport AppIntents/' QuizIsland/Intents/IslandPaginationIntent.swift || true
+          sed -i '' 's/injectAndSend(prompt: prompt)/injectAndSend(prompt: prompt, enableSearch: SharedIslandStore.shared.enableWebSearch)/' QuizIsland/Core/HeadlessWebSolver.swift || true
+
+      - name: Install XcodeGen and Generate Project
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build Unsigned Release Archive
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          xcodebuild -project QuizIsland.xcodeproj \
+            -scheme QuizIsland \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            clean build
+
+      - name: Package IPA
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          mkdir -p Payload
+          cp -r build/Build/Products/Release-iphoneos/QuizIsland.app Payload/
+          zip -r QuizIsland.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuizIsland-iOS17-Unsigned
+          path: ${{ env.PROJECT_DIR }}/QuizIsland.ipa
