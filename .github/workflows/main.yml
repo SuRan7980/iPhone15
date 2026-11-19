@@ -8,7 +8,7 @@ on:
 jobs:
   build-ipa:
     name: Build QuizIsland IPA on macOS
-    runs-on: macos-15
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repository
