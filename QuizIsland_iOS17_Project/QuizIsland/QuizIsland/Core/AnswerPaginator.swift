@@ -23,7 +23,7 @@ enum AnswerPaginator {
             ("\\Rightarrow", "⇒"),
             ("\\because", "∵"),
             ("\\therefore", "∴"),
-            ("\*\*", ""),
+            ("**", ""),
             ("### ", ""),
             ("## ", ""),
             ("$$", ""),
